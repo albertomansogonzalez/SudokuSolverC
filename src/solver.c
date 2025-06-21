@@ -91,8 +91,11 @@ bool solveSudoku(Sudoku board, int* nSoluciones, int delay, bool allFlag) {
     // En vez de recorrer con 2 bucles todo el sudoku, usamos la heuristica
     int row, col;
     if (!encontrarCeldaMenosCandidatos(board, &row, &col)) {
-        // No hay celdas vacías -> Sudoku completado
-        return true;
+        // Caso base de la recursion, No hay celdas vacías -> Sudoku completado
+
+        if (allFlag) imprimirSudokuCadena(board); //imprime esta solucion
+        (*nSoluciones)++;
+        return true;  //Sudoku esta solucionado
     }
 
 
@@ -119,9 +122,4 @@ bool solveSudoku(Sudoku board, int* nSoluciones, int delay, bool allFlag) {
     // No hay ningun digito valido posible, backtrack
     return false;
 
-
-    //Caso base de la recursion, se termina de recorrer la matriz por lo que no quedan celdas vacias
-    if (allFlag) imprimirSudokuCadena(board); //imprime esta solucion
-    (*nSoluciones)++;
-    return true;  //Sudoku esta solucionado
 }
