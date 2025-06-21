@@ -1,6 +1,6 @@
 /**
  *
- * Sudoku solver mediante Backtraking.
+ * Sudoku solver mediante Backtraking. Minimum Remaining Value (MRV) heuristic.
  *
  * Utiliza funcion solveSudoku como base del backtraking con la recursion y la vuelta atras.
  * Apoyado por la funcion auxiliar isValid para comprobar si cada nuevo numero es valido o no.
