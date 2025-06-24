@@ -1,6 +1,7 @@
 #ifndef SOLVER_H
 #define SOLVER_H
 
+#include <stdbool.h>
 #include "sudoku_utils.h"
 
 

@@ -1,9 +1,11 @@
 /**
  *
- * Sudoku solver mediante Backtraking. Minimum Remaining Value (MRV) heuristic.
+ * Sudoku solver mediante Backtraking. Minimum Remaining Value (MRV) heuristic. Utilizando matriz de Candidatos
  *
- * Utiliza funcion solveSudoku como base del backtraking con la recursion y la vuelta atras.
+ * Utiliza funcion solveSudoku para inicializar la matriz de candidatos y llamar a backtrakingSudoku como base del backtraking con la recursion y la vuelta atras.
  * Apoyado por la funcion auxiliar isValid para comprobar si cada nuevo numero es valido o no.
+ *
+ * "backtrakingSudoku" utiliza "encontrarCeldaMenosCandidatos" para la heuristica y "modificarCandidatos" para eliminar los candidatos
  *
  * Uso: "SudokuSolver 704305600693000852210000003009008230031092764400610900300059106008060390020001008 [--human | --all | --benchmark | --delay <N>]"
  *   Con el sudoku en formato de string con numeros de izquierda a derecha, y de arriba a abajo

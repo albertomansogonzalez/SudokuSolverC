@@ -1,11 +1,11 @@
 # SudokuSolverC
 
 Implementación en C de algoritmo de Backtraking para resolver sudokus.
- - Utiliza funcion solveSudoku como base del backtraking con la recursion y la vuelta atras.
- - Apoyado por la funcion auxiliar isValid para comprobar si cada nuevo numero es valido o no.
+ - Utiliza matriz de candidatos como estructura principal.
+ - Funcion solveSudoku para inicializar la matriz de candidatos y llamar a backtrakingSudoku como base del backtraking con la recursion y la vuelta atras.
  - Implementamos Heuristica Minimum Remaining Value (MRV) heuristic. (Celdas con menos candidatos)
-      - Mediante funcion "encontrarCeldaMenosCandidatos" apoyada por "countCandidates" 
-
+ - "backtrakingSudoku" utiliza "encontrarCeldaMenosCandidatos" para la heuristica y "modificarCandidatos" para eliminar los candidatos
+ - Nota: Al utilizar la matriz de candidatos se obtiene menos tiempos que cuando se calculaban directamente
 ---
 
 ## Ejemplo de uso:  

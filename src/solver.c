@@ -5,6 +5,137 @@
 #include "sudoku_utils.h"
 
 
+/**
+ * @brief modificarCandidatos Funcion auxiliar utilizada en "backtrakingSudoku"
+ *
+ * Elimina de la matriz de candidatos, el numero "num" como candidatos en la celdas:
+ * - propia celda, quita todos los candidatos
+ * - de la columna
+ * - de la fila
+ * - del bloque 3x3
+ */
+static void modificarCandidatos(bool candidatos[NROWS][NCOLS][9], int row, int col, int num){
+
+    //quitar el numero como candidato de las celdas correspondientes (propia, fila y columna
+    for (int i = 0; i < 9; i++){
+        candidatos[row][col][i] = false;
+        candidatos[row][i][num-1] = false;
+        candidatos[i][col][num-1] = false;
+    }
+
+
+    // Quitar candidato del bloque 3x3
+    int startRow = row - (row % BLOCKSIZE); //encontrar fila donde comienza su bloque
+    int startCol = col - (col % BLOCKSIZE); //encontrar columna donde comienza su bloque
+    for (int i = 0; i < BLOCKSIZE; ++i) { //2 bucles para recorrer el bloque
+        for (int j = 0; j < BLOCKSIZE; ++j) {
+            candidatos[startRow + i][startCol + j][num-1] = false;
+        }
+    }
+}
+
+
+/**
+ * @brief encontrarCeldaMenosCandidatos Funcion auxiliar utilizada en "backtrakingSudoku"
+ *
+ * Recorre la matriz de candidatos y encuentra la celda con el menor numero de candidatos
+ * Heuristica de Minimum Remaining Value (MRV)
+ *
+ * @pos "row" y "col" indican la celda con el menor numero de candidatos
+ *
+ * @return -1 si ya esta completado, 0 si no hay candidatos disponibles (podar), 1 exito seteando row y col
+ */
+static int encontrarCeldaMenosCandidatos(Sudoku board, bool candidatos[NROWS][NCOLS][9], int *row, int *col) {
+    int minOptions = 10; // mayor que 9
+    int found = false;
+    bool sudokuCompleto = true;
+
+    for (int r = 0; r < NROWS; ++r) {
+        for (int c = 0; c < NCOLS; ++c) {
+            if (board[r][c] != 0) continue; //celda ya resuelta
+
+            sudokuCompleto = false; //quedan huecos
+
+            //contar los candidatos de la celda
+            int count = 0;
+            for (int num = 0; num < 9; ++num) {
+                if (candidatos[r][c][num]) {
+                    count++;
+                }
+            }
+
+            if (count > 0 && count < minOptions) {
+                minOptions = count;
+                *row = r;
+                *col = c;
+                found = 1;
+                if (minOptions == 1) return 1; // heurística: salir temprano si es muy bueno
+            }
+        }
+    }
+
+    if (sudokuCompleto){
+        return -1;
+    }else{
+        return found; //return 0 si no hay candidatos (podar rama), 1 si si hay candidatos
+    }
+
+}
+
+/**
+ * @brief backtrakingSudoku Realiza el backtraking, utilizando la matriz de candidatos
+ * @pre La matriz de candidatos tiene que estar inicializada
+ */
+static bool backtrakingSudoku(Sudoku board, bool candidatos[NROWS][NCOLS][9], int* nSoluciones, int delay, bool allFlag) {
+
+    int row, col; //celda a rellenar
+
+    //MVR Heuristica
+    int valor = encontrarCeldaMenosCandidatos(board, candidatos, &row, &col);
+    if ( valor == -1){
+        //no quedan huecos, sudoku completo
+        if (allFlag) imprimirSudokuCadena(board); //imprime esta solucion
+        (*nSoluciones)++;
+        return true;
+    }else if (valor == 0){
+        return false;
+    }else{ /* valor == 1*/
+        /* si hay candidatos, en (row,col) */
+    }
+
+    // Intenta colocar digito 1-9
+    for (int num = 1; num <= 9; ++num) {
+        // Verifica si el numero elegido es un candidato
+        if (!candidatos[row][col][num-1]){
+            continue;
+        }
+
+        //Coloca el digito en la celda
+        board[row][col] = num;
+        //modificar estructuras de datos de candidatos
+        bool new_candidatos[NROWS][NCOLS][9];
+        //copiamos la matriz de candidatos para la siguiente llamada recursiva
+        memcpy(new_candidatos, candidatos, sizeof(new_candidatos)); // si pongo sizeof(candidatos) falla por "decay" en Lenguaje C!!!
+        //eliminamos los candidatos tras colocar el "num"
+        modificarCandidatos(new_candidatos, row, col, num);
+
+        /* en modo delay, se imprime el estado actual*/ if(delay > 0){printf("\033[H");imprimirSudoku(board);Sleep(delay);}
+        // LLAMADA RECURSIVA, con la nueva matriz de candidatos
+        if (backtrakingSudoku(board, new_candidatos, nSoluciones, delay, allFlag)){
+            if (allFlag){board[row][col] = 0; continue;} // en caso de querer seguir buscando mas soluciones
+            // Volver todas las llamadas recursivas, cuando solucion encontrada
+            return true; //deshace hacia arriba todas las llamadas recursivas
+        }else{
+            // BACKTRACK, solveSudoku ha devuelto false, se corta esta rama porque no funciona
+            board[row][col] = 0; // se vuelve a dejar la celda como desconocida
+            //se retorna a la llamada anterior, con la matriz de candidatos anterior
+        }
+    }
+
+    // No hay ningun digito valido posible, backtrack
+    return false;
+}
+
 
 /**
  * @brief isValid Funcion privada auxiliar, comprueba si colocar un nuevo digito num en la posicion (row,col) es valido en el board actual
@@ -42,84 +173,30 @@ static bool isValid(const Sudoku board, int row, int col, int num) {
     return true;
 }
 
-/**
- * @brief countCandidates Cuenta el numero de candidatos posibles de una celda
- */
-static int countCandidates(Sudoku board, int row, int col) {
-    int count = 0;
-    for (int num = 1; num <= 9; num++) {
-        if (isValid(board, row, col, num)) {
-            count++;
-        }
-    }
-    return count;
-}
 
-/**
- * @brief encontrarCeldaMenosCandidatos Recorre todo el sudoku buscando la celda con menos candidatos
- *
- * Utiliza funcion auxiliar "countCandidates" para cada celda del sudoku
- *
- */
-static bool encontrarCeldaMenosCandidatos(Sudoku board, int *row, int *col) {
-    int minOptions = 10; // mayor que el máximo 9
-    bool found = false;
+bool solveSudoku(Sudoku board, int* nSoluciones, int delay, bool allFlag) {
 
+    /**
+    * @brief candidatos Matriz de digitos candidatos posibles para cada celda, [0] digito 1, [1] digito 2, [8] digito 9
+    */
+    bool candidatos[NROWS][NCOLS][9] = {false};
+
+
+    //Rellenamos la primera vez la matriz de candidatos
     for (int r = 0; r < NROWS; r++) {
         for (int c = 0; c < NCOLS; c++) {
-            if (board[r][c] == 0) {  // celda vacía
-                int options = countCandidates(board, r, c);
-                if (options < minOptions) {
-                    minOptions = options;
-                    *row = r;
-                    *col = c;
-                    found = true;
+            if (board[r][c] != 0) continue; //es una pista, por lo que no tiene candidatos
 
-                    if (minOptions == 1) {
-                        // No se puede tener menos que 1, se puede parar aquí
-                        return true;
-                    }
+            for (int num = 1; num <= 9; num++) {
+                if (isValid(board, r, c, num)) {
+                    candidatos[r][c][num-1] = true;
                 }
             }
         }
     }
-    return found;
+
+    //ejecutamos el Backtraking
+    return backtrakingSudoku(board, candidatos, nSoluciones, delay, allFlag);
 }
 
-bool solveSudoku(Sudoku board, int* nSoluciones, int delay, bool allFlag) {
 
-    // En vez de recorrer con 2 bucles todo el sudoku, usamos la heuristica
-    int row, col;
-    if (!encontrarCeldaMenosCandidatos(board, &row, &col)) {
-        // Caso base de la recursion, No hay celdas vacías -> Sudoku completado
-
-        if (allFlag) imprimirSudokuCadena(board); //imprime esta solucion
-        (*nSoluciones)++;
-        return true;  //Sudoku esta solucionado
-    }
-
-
-    // Intenta colocar digito 1-9
-    for (int num = 1; num <= 9; ++num) {
-        // Verifica si el numero elegido es valido, segun el estado actual
-        if (isValid(board, row, col, num)) {
-            //Coloca el digito en la celda
-            board[row][col] = num;
-            /* en modo delay, se imprime el estado actual*/ if(delay > 0){printf("\033[H");imprimirSudoku(board);Sleep(delay);}
-            // LLAMADA RECURSIVA
-            if (solveSudoku(board, nSoluciones, delay, allFlag)){
-                if (allFlag){board[row][col] = 0; continue;} // en caso de querer seguir buscando mas soluciones
-                // Volver todas las llamadas recursivas, cuando solucion encontrada
-                return true; //deshace hacia arriba todas las llamadas recursivas
-            }else{
-                // BACKTRACK, solveSudoku ha devuelto false, se corta esta rama porque no funciona
-                board[row][col] = 0; // se vuelve a dejar la celda como desconocida
-            }
-        }else{
-            //Numero no es valido, se prueba con el siguiente digito
-        }
-    }
-    // No hay ningun digito valido posible, backtrack
-    return false;
-
-}
