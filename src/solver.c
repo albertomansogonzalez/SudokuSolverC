@@ -1,8 +1,56 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <windows.h>        //para el Sleep(delayShow), IMPORTANTE: modificar para Linux
 #include "solver.h"
 #include "sudoku_utils.h"
+
+/**
+ * @brief Bitmask tipo para representar los candidatos de una celda
+ *
+ * 0b000111111 → 1,2,3,4,5 son candidatos
+ * 0b000000100 → solo el número 3 es candidato
+ */
+typedef uint16_t Bitmask;
+
+#define ALL_CANDIDATES 0x1FF // 9 bits en 1 => 0b0000000111111111
+
+// El número n (1-9) en forma de bitmask
+#define BIT(n) (1 << ((n) - 1))
+
+static inline void quitarCandidato(Bitmask candidatos[NROWS][NCOLS], int row, int col, int n) {
+    candidatos[row][col] &= ~BIT(n);
+}
+
+// Agregar un candidato n
+static inline void addCandidato(Bitmask candidatos[NROWS][NCOLS], int row, int col, int n) {
+    candidatos[row][col] |= BIT(n);
+}
+
+static inline int esCandidato(Bitmask candidatos[NROWS][NCOLS], int row, int col, int n) {
+    return candidatos[row][col] & BIT(n);
+}
+
+// Contar el número de candidatos (número de bits en 1)
+static inline int contarCandidatos(Bitmask bm) {
+    int count = 0;
+    while (bm) {
+        count += bm & 1;
+        bm >>= 1;
+    }
+    return count;
+}
+
+// Obtener el único candidato (si hay solo uno)
+static inline int get_single_candidate(Bitmask bm) {
+    if (contarCandidatos(bm) != 1) return 0;
+    for (int i = 0; i < 9; i++) {
+        if (bm & (1 << i)) return i + 1;
+    }
+    return 0;
+}
+
+
 
 
 /**
@@ -14,13 +62,15 @@
  * - de la fila
  * - del bloque 3x3
  */
-static void modificarCandidatos(bool candidatos[NROWS][NCOLS][9], int row, int col, int num){
+static void modificarCandidatos(Bitmask candidatos[NROWS][NCOLS], int row, int col, int num){
+
+    // quita todos los candidatos de la celda
+    candidatos[row][col] = 0;
 
     //quitar el numero como candidato de las celdas correspondientes (propia, fila y columna
     for (int i = 0; i < 9; i++){
-        candidatos[row][col][i] = false;
-        candidatos[row][i][num-1] = false;
-        candidatos[i][col][num-1] = false;
+        quitarCandidato(candidatos, row, i, num);
+        quitarCandidato(candidatos, i, col, num);
     }
 
 
@@ -29,7 +79,7 @@ static void modificarCandidatos(bool candidatos[NROWS][NCOLS][9], int row, int c
     int startCol = col - (col % BLOCKSIZE); //encontrar columna donde comienza su bloque
     for (int i = 0; i < BLOCKSIZE; ++i) { //2 bucles para recorrer el bloque
         for (int j = 0; j < BLOCKSIZE; ++j) {
-            candidatos[startRow + i][startCol + j][num-1] = false;
+            quitarCandidato(candidatos, startRow + i, startCol + j, num);
         }
     }
 }
@@ -45,7 +95,7 @@ static void modificarCandidatos(bool candidatos[NROWS][NCOLS][9], int row, int c
  *
  * @return -1 si ya esta completado, 0 si no hay candidatos disponibles (podar), 1 exito seteando row y col
  */
-static int encontrarCeldaMenosCandidatos(Sudoku board, bool candidatos[NROWS][NCOLS][9], int *row, int *col) {
+static int encontrarCeldaMenosCandidatos(Sudoku board, Bitmask candidatos[NROWS][NCOLS], int *row, int *col) {
     int minOptions = 10; // mayor que 9
     int found = false;
     bool sudokuCompleto = true;
@@ -57,12 +107,7 @@ static int encontrarCeldaMenosCandidatos(Sudoku board, bool candidatos[NROWS][NC
             sudokuCompleto = false; //quedan huecos
 
             //contar los candidatos de la celda
-            int count = 0;
-            for (int num = 0; num < 9; ++num) {
-                if (candidatos[r][c][num]) {
-                    count++;
-                }
-            }
+            int count = contarCandidatos(candidatos[r][c]);
 
             if (count > 0 && count < minOptions) {
                 minOptions = count;
@@ -86,7 +131,7 @@ static int encontrarCeldaMenosCandidatos(Sudoku board, bool candidatos[NROWS][NC
  * @brief backtrakingSudoku Realiza el backtraking, utilizando la matriz de candidatos
  * @pre La matriz de candidatos tiene que estar inicializada
  */
-static bool backtrakingSudoku(Sudoku board, bool candidatos[NROWS][NCOLS][9], int* nSoluciones, int delay, bool allFlag) {
+static bool backtrakingSudoku(Sudoku board, Bitmask candidatos[NROWS][NCOLS], int* nSoluciones, int delay, bool allFlag) {
 
     int row, col; //celda a rellenar
 
@@ -106,14 +151,14 @@ static bool backtrakingSudoku(Sudoku board, bool candidatos[NROWS][NCOLS][9], in
     // Intenta colocar digito 1-9
     for (int num = 1; num <= 9; ++num) {
         // Verifica si el numero elegido es un candidato
-        if (!candidatos[row][col][num-1]){
+        if (!esCandidato(candidatos, row, col, num)){
             continue;
         }
 
         //Coloca el digito en la celda
         board[row][col] = num;
         //modificar estructuras de datos de candidatos
-        bool new_candidatos[NROWS][NCOLS][9];
+        Bitmask new_candidatos[NROWS][NCOLS];
         //copiamos la matriz de candidatos para la siguiente llamada recursiva
         memcpy(new_candidatos, candidatos, sizeof(new_candidatos)); // si pongo sizeof(candidatos) falla por "decay" en Lenguaje C!!!
         //eliminamos los candidatos tras colocar el "num"
@@ -177,10 +222,12 @@ static bool isValid(const Sudoku board, int row, int col, int num) {
 bool solveSudoku(Sudoku board, int* nSoluciones, int delay, bool allFlag) {
 
     /**
-    * @brief candidatos Matriz de digitos candidatos posibles para cada celda, [0] digito 1, [1] digito 2, [8] digito 9
+    * @brief candidatos Bitmask de digitos candidatos posibles para cada celda:
+    *
+    * 0b000111111 → 1,2,3,4,5 son candidatos
+    * 0b000000100 → solo el número 3 es candidato
     */
-    bool candidatos[NROWS][NCOLS][9] = {false};
-
+    Bitmask candidatos[NROWS][NCOLS] = {0}; // Matriz de candidatos
 
     //Rellenamos la primera vez la matriz de candidatos
     for (int r = 0; r < NROWS; r++) {
@@ -189,7 +236,7 @@ bool solveSudoku(Sudoku board, int* nSoluciones, int delay, bool allFlag) {
 
             for (int num = 1; num <= 9; num++) {
                 if (isValid(board, r, c, num)) {
-                    candidatos[r][c][num-1] = true;
+                    addCandidato(candidatos, r,c,num);
                 }
             }
         }
